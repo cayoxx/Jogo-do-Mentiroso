@@ -52,8 +52,7 @@
 
 <script>
     // Tente se conectar ao servidor. Mude 'localhost' se o servidor estiver em outro PC na rede.
-    const ws = new WebSocket('ws://localhost:8080');
-
+const ws = new WebSocket('wss://jogo-do-mentiroso.onrender.com');
     ws.onopen = () => {
         console.log('Conectado ao servidor de Truco!');
         document.getElementById('status').innerText = 'Conectado! Aguardando oponente...';
