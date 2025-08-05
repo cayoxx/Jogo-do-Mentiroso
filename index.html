@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Truco Online com Amigos</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #0d4b24; color: white; margin: 0; padding: 20px; }
+        .mesa { max-width: 800px; margin: auto; }
+        .area-jogador { border: 2px solid #fff3; border-radius: 10px; padding: 15px; margin-bottom: 20px; }
+        .area-jogador h2 { margin: 0 0 10px; font-size: 1.2em; }
+        .cartas { display: flex; justify-content: center; gap: 10px; min-height: 120px; }
+        .carta {
+            width: 80px; height: 110px; border: 1px solid #333; border-radius: 8px;
+            background-color: white; color: black; display: flex;
+            flex-direction: column; justify-content: space-between; padding: 5px;
+            cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        }
+        .carta:hover { transform: translateY(-10px); box-shadow: 4px 10px 15px rgba(0,0,0,0.4); }
+        .carta.verso { background-color: #b02424; }
+        .info-jogo { text-align: center; margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; }
+        #mesa-centro { border: 2px dashed #fff9; border-radius: 10px; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
+        #status { font-size: 1.2em; font-weight: bold; margin-bottom: 10px; }
+        #placar { font-size: 1.5em; }
+    </style>
+</head>
+<body>
+
+<div class="mesa">
+    <div class="area-jogador" id="area-oponente">
+        <h2>Oponente</h2>
+        <div class="cartas" id="cartas-oponente"></div>
+    </div>
+
+    <div class="info-jogo">
+        <div id="placar">NÓS: 0 x 0 :ELES</div>
+        <div id="mesa-centro">
+            <div id="status">Aguardando jogadores...</div>
+            <div id="vira"></div>
+        </div>
+    </div>
+
+    <div class="area-jogador" id="area-minha">
+        <h2>Suas Cartas</h2>
+        <div class="cartas" id="minhas-cartas"></div>
+    </div>
+    
+    <div style="text-align: center; margin-top: 20px;">
+        <button>TRUCO!</button>
+    </div>
+</div>
+
+<script>
+    // Tente se conectar ao servidor. Mude 'localhost' se o servidor estiver em outro PC na rede.
+    const ws = new WebSocket('ws://localhost:8080');
+
+    ws.onopen = () => {
+        console.log('Conectado ao servidor de Truco!');
+        document.getElementById('status').innerText = 'Conectado! Aguardando oponente...';
+    };
+
+    ws.onmessage = event => {
+        const message = JSON.parse(event.data);
+        
+        if (message.type === 'ERRO') {
+            document.getElementById('status').innerText = `Erro: ${message.payload}`;
+            return;
+        }
+
+        if (message.type === 'ATUALIZAR_ESTADO') {
+            renderizarJogo(message.payload);
+        }
+    };
+
+    ws.onclose = () => {
+        document.getElementById('status').innerText = 'Desconectado do servidor.';
+    };
+
+    function renderizarJogo(estado) {
+        const meuId = ws.url; // Hack para diferenciar, o servidor precisa enviar o ID
+        
+        // Renderiza minhas cartas
+        const minhasCartasDiv = document.getElementById('minhas-cartas');
+        minhasCartasDiv.innerHTML = '';
+        const eu = estado.jogadores.find(j => j.cartas.length > 0 && j.cartas[0] !== 'verso'); // Encontra quem não tem cartas 'verso'
+        
+        if (eu) {
+            eu.cartas.forEach(carta => {
+                minhasCartasDiv.appendChild(criarElementoCarta(carta, false));
+            });
+        }
+        
+        // Renderiza cartas do oponente
+        const cartasOponenteDiv = document.getElementById('cartas-oponente');
+        cartasOponenteDiv.innerHTML = '';
+        const oponente = estado.jogadores.find(j => j.cartas[0] === 'verso');
+        if (oponente) {
+             oponente.cartas.forEach(carta => {
+                cartasOponenteDiv.appendChild(criarElementoCarta(carta, true));
+            });
+        }
+
+        // Renderiza Vira
+        const viraDiv = document.getElementById('vira');
+        viraDiv.innerHTML = 'Vira: ';
+        viraDiv.appendChild(criarElementoCarta(estado.vira, false));
+
+        document.getElementById('status').innerText = `Vez do ${estado.jogadores[estado.vez].nome}`;
+    }
+
+    function criarElementoCarta(carta, isVerso) {
+        const div = document.createElement('div');
+        if (isVerso) {
+            div.className = 'carta verso';
+            return div;
+        }
+        div.className = 'carta';
+        div.innerHTML = `<span>${carta.valor}</span><span>${getNaipeSymbol(carta.naipe)}</span>`;
+        
+        div.onclick = () => {
+            jogarCarta(carta);
+        };
+        return div;
+    }
+
+    function jogarCarta(carta) {
+        ws.send(JSON.stringify({
+            type: 'JOGAR_CARTA',
+            payload: { carta }
+        }));
+    }
+
+    function getNaipeSymbol(naipe) {
+        switch(naipe) {
+            case 'Ouros': return '♦️';
+            case 'Espadas': return '♠️';
+            case 'Copas': return '♥️';
+            case 'Paus': return '♣️';
+            default: return '';
+        }
+    }
+</script>
+
+</body>
+</html>
